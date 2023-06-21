@@ -1,0 +1,83 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  username  String?
+  email     String   @unique
+  password  String
+  salt      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  role      Role
+  Order     Order[]
+}
+
+model Product {
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  price        Int
+  stock        Int
+  description  String
+  image        Image          @relation(fields: [imageId], references: [id])
+  category     Category       @relation(fields: [categoryId], references: [id])
+  categoryId   String         @db.ObjectId
+  OrderProduct OrderProduct[]
+  imageId      String         @db.ObjectId
+}
+
+model Image {
+  id      String    @id @default(auto()) @map("_id") @db.ObjectId
+  name    String    @unique
+  url     String
+  Order   Order[]
+  Product Product[]
+}
+
+model Category {
+  id      String    @id @default(auto()) @map("_id") @db.ObjectId
+  name    String    @unique
+  Product Product[]
+}
+
+model Order {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  orderCode      String
+  orderProduct   OrderProduct[]
+  user           User           @relation(fields: [userId], references: [id])
+  userId         String         @db.ObjectId
+  customerName   String
+  whatsappNumber String
+  description    String
+  orderDate      DateTime       @default(now())
+  eventDate      DateTime
+  pickupDate     DateTime
+  address        String
+  status         String
+  paymentProof   Image?         @relation(fields: [imageId], references: [id])
+  imageId        String?        @db.ObjectId
+}
+
+model OrderProduct {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  product   Product @relation(fields: [productId], references: [id])
+  productId String  @db.ObjectId
+  order     Order   @relation(fields: [orderId], references: [id])
+  orderId   String  @db.ObjectId
+  quantity  Int
+}
+
+enum Role {
+  USER
+  ADMIN
+}

@@ -1,21 +1,30 @@
 const { prisma } = require("../../config/prisma");
-const { IsValidDataURI } = require("../../utils");
-const { UploadImage, DeleteImage } = require("../../utils/upload-image");
+
+const { updloadListImage, destroyListImage } = require("../../utils/product");
 
 async function CreateProduct(req, res) {
-  const { name, price, stock, image, category, description } = req.body;
+  const {
+    name,
+    price,
+    stock = 0,
+    images,
+    category,
+    description,
+    code,
+  } = req.body;
 
   try {
-    const { image_id, image_url } = await UploadImage(image);
+    const listImage = await updloadListImage(images);
 
     const product = await prisma.product.create({
       data: {
         name,
-        price,
-        stock,
+        code,
         description,
+        stock: Number(stock),
+        price: Number(price),
         category: { connect: { id: category } },
-        image: { create: { name: image_id, url: image_url } },
+        images: { createMany: { data: listImage } },
       },
     });
 
@@ -34,10 +43,12 @@ async function GetProduct(req, res) {
       select: {
         id: true,
         category: { select: { id: true, name: true } },
-        image: { select: { id: true, name: true, url: true } },
+        images: { select: { id: true, name: true, url: true } },
         name: true,
         stock: true,
         price: true,
+        description: true,
+        code: true,
         _count: true,
       },
       take: Number(take) || undefined,
@@ -63,10 +74,12 @@ async function GetDetailProduct(req, res) {
       select: {
         id: true,
         category: { select: { id: true, name: true } },
-        image: { select: { id: true, name: true, url: true } },
+        images: { select: { id: true, name: true, url: true } },
         name: true,
         stock: true,
         price: true,
+        description: true,
+        code: true,
         _count: true,
       },
     });
@@ -77,43 +90,63 @@ async function GetDetailProduct(req, res) {
 }
 
 async function UpdateProduct(req, res) {
-  const { name, price, stock, image, category, description } = req.body;
+  const {
+    name,
+    price,
+    stock = 0,
+    images,
+    category,
+    description,
+    code,
+  } = req.body;
   const { product_id } = req.params;
 
   try {
     const editedProduct = await prisma.product.findUnique({
       where: { id: product_id },
       select: {
-        image: { select: { id: true, name: true, url: true } },
+        images: { select: { id: true, name: true, url: true } },
       },
     });
 
-    let data = {
-      name,
-      price,
-      stock,
-      description,
-      categoryId: category,
-    };
+    const listImageProduct = editedProduct.images.map((value) => {
+      return value.id;
+    });
 
-    if (IsValidDataURI(image)) {
-      const { image_id, image_url } = await UploadImage(image);
-      data = {
-        ...data,
-        image: {
-          delete: { id: editedProduct.image.name },
-          create: { name: image_id, url: image_url },
-        },
-      };
-    }
+    const deletedImage = listImageProduct.filter(
+      (value) => !images.includes(value)
+    );
+
+    const newImage = images.filter(
+      (value) => !listImageProduct.includes(value)
+    );
+
+    const listImage = await updloadListImage(newImage);
+    const listDestroyedImage = await destroyListImage(deletedImage);
+
+    const imageCreateMany = listImage.length !== 0 && {
+      createMany: { data: listImage },
+    };
 
     const product = await prisma.product.update({
       where: { id: product_id },
-      data,
+      data: {
+        name,
+        code,
+        description,
+        categoryId: category,
+        stock: Number(stock),
+        price: Number(price),
+        images: {
+          deleteMany: { id: { in: listDestroyedImage } },
+          ...imageCreateMany,
+        },
+      },
     });
 
     res.status(200).json({ message: "product updated", data: product });
   } catch (error) {
+    console.log(error);
     res.status(400).json({ message: error.message });
   }
 }
@@ -123,14 +156,20 @@ async function DeleteProduct(req, res) {
   try {
     const product = await prisma.product.delete({
       where: { id: product_id },
-      include: { image: true },
-      select: { image: { select: { name: true } } },
+      select: { images: { select: { name: true, id: true } } },
     });
 
-    await DeleteImage(product.image.name);
+    const listImageProduct = product.images.map((value) => {
+      return value.id;
+    });
+
+    await prisma.image.deleteMany({ where: { id: { in: listImageProduct } } });
+
+    await destroyListImage(listImageProduct);
 
     res.status(200).json({ message: "product deleted", data: product });
   } catch (error) {
+    console.log(error);
     res.status(400).json({ message: error.message });
   }
 }

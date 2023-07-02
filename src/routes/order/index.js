@@ -4,16 +4,21 @@ const {
   DeleteOrder,
   GetOrder,
   GetUserOrder,
+  GetOrderById,
   UploadPaymentProof,
+  ChangeStatus,
+  DownloadPdf,
 } = require("../../controllers/order");
-const UserAuth = require("../../midlewares/auth");
 
 const router = express.Router();
 
-router.get("/", UserAuth, GetOrder);
-router.get("/user", UserAuth, GetUserOrder);
-router.post("/create", UserAuth, CreateOrder);
-router.put("/upload-payment/:order_id", UserAuth, UploadPaymentProof);
-router.delete("/delete/:order_id", UserAuth, DeleteOrder);
+router.get("/", GetOrder);
+router.get("/user", GetUserOrder);
+router.get("/detail/:order_id", GetOrderById);
+router.post("/create", CreateOrder);
+router.put("/upload-payment/:order_id", UploadPaymentProof);
+router.put("/change-status/:order_id", ChangeStatus);
+router.get("/print-order/:order_id", DownloadPdf);
+router.delete("/delete/:order_id", DeleteOrder);
 
 module.exports = router;

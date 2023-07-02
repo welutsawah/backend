@@ -1,23 +1,16 @@
-const {
-  cloudinary,
-  uploadImageOptions,
-} = require('../config/cloudinary');
+const { cloudinary, uploadImageOptions } = require("../config/cloudinary");
 
 module.exports.UploadImage = (image) => {
   return new Promise((resolve, reject) => {
-    cloudinary.uploader.upload(
-      image,
-      uploadImageOptions,
-      (error, result) => {
-        if (result && result.secure_url) {
-          return resolve({
-            image_id: result.public_id,
-            image_url: result.url,
-          });
-        }
-        return reject({ message: error.message });
+    cloudinary.uploader.upload(image, uploadImageOptions, (error, result) => {
+      if (result && result.secure_url) {
+        return resolve({
+          image_id: result.public_id,
+          image_url: result.url,
+        });
       }
-    );
+      return reject({ message: error.message });
+    });
   });
 };
 

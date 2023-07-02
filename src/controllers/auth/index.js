@@ -44,7 +44,15 @@ async function Register(req, res) {
       role,
     });
 
-    res.status(201).json({ token });
+    res.status(201).json({
+      token,
+      user: {
+        id: newUser.id,
+        username: username,
+        role: role,
+        email: email,
+      },
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -57,7 +65,7 @@ async function Login(req, res) {
     const user = await prisma.user.findUnique({
       where: { email },
     });
-    // console.log(user);
+
     if (user) {
       const validPassword = await ValidatePassword(
         password,
@@ -73,7 +81,15 @@ async function Login(req, res) {
           role: user.role,
         });
 
-        res.status(200).json({ token });
+        res.status(200).json({
+          token,
+          user: {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            email: user.email,
+          },
+        });
         return;
       }
 

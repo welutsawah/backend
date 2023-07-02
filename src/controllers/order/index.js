@@ -1,6 +1,8 @@
 const { prisma } = require("../../config/prisma");
 const { GenerateUniqueCode, DecodeSignature } = require("../../utils");
 const { UploadImage, DeleteImage } = require("../../utils/upload-image");
+const invoiceHelper = require("../../utils/createInvoice");
+const dayjs = require("dayjs");
 
 async function CreateOrder(req, res) {
   const {
@@ -34,6 +36,7 @@ async function CreateOrder(req, res) {
 
     res.status(201).json({ data: order });
   } catch (error) {
+    console.log(error);
     res.status(400).json({ message: error.message });
   }
 }
@@ -64,7 +67,7 @@ async function GetOrder(req, res) {
             product: {
               select: {
                 id: true,
-                image: true,
+                images: true,
                 category: { select: { name: true } },
                 name: true,
                 price: true,
@@ -112,7 +115,7 @@ async function GetUserOrder(req, res) {
             product: {
               select: {
                 id: true,
-                image: true,
+                images: true,
                 category: { select: { name: true } },
                 name: true,
                 price: true,
@@ -122,6 +125,51 @@ async function GetUserOrder(req, res) {
         },
       },
     });
+    res.status(200).json({ data: order });
+  } catch (error) {
+    console.log(error);
+    res.status(400).json({ message: error.message });
+  }
+}
+
+async function GetOrderById(req, res) {
+  const { order_id } = req.params;
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: order_id },
+      select: {
+        address: true,
+        customerName: true,
+        description: true,
+        eventDate: true,
+        id: true,
+        orderCode: true,
+        orderDate: true,
+        paymentProof: true,
+        pickupDate: true,
+        status: true,
+        whatsappNumber: true,
+        user: { select: { email: true, id: true } },
+        orderProduct: {
+          select: {
+            id: true,
+            quantity: true,
+            product: {
+              select: {
+                id: true,
+                images: true,
+                category: { select: { name: true } },
+                name: true,
+                price: true,
+                code: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
     res.status(200).json({ data: order });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -136,7 +184,28 @@ async function UploadPaymentProof(req, res) {
 
     const order = await prisma.order.update({
       where: { id: order_id },
-      data: { paymentProof: { create: { name: image_id, url: image_url } } },
+      data: {
+        paymentProof: { create: { name: image_id, url: image_url } },
+        status: "payment",
+      },
+    });
+
+    res.status(200).json({ data: order });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+}
+
+async function ChangeStatus(req, res) {
+  const { order_id } = req.params;
+  const { status } = req.body;
+
+  try {
+    const order = await prisma.order.update({
+      where: { id: order_id },
+      data: {
+        status,
+      },
     });
 
     res.status(200).json({ data: order });
@@ -149,24 +218,93 @@ async function DeleteOrder(req, res) {
   const { order_id } = req.params;
 
   try {
-    const order = await prisma.order.delete({
+    const order = await prisma.order.deleteMany({
       where: { id: order_id },
-      include: { paymentProof: true },
-      select: { paymentProof: { select: { name: true } } },
     });
-
-    await DeleteImage(order.paymentProof.name);
 
     res.status(200).json({ data: order });
   } catch (error) {
+    console.log(error);
     res.status(400).json({ message: error.message });
   }
+}
+
+async function DownloadPdf(req, res) {
+  const { order_id } = req.params;
+
+  prisma.order
+    .findUnique({
+      where: { id: order_id },
+      select: {
+        address: true,
+        customerName: true,
+        description: true,
+        eventDate: true,
+        id: true,
+        orderCode: true,
+        orderDate: true,
+        paymentProof: true,
+        pickupDate: true,
+        status: true,
+        whatsappNumber: true,
+        user: { select: { email: true, id: true } },
+        orderProduct: {
+          select: {
+            id: true,
+            quantity: true,
+            product: {
+              select: {
+                id: true,
+                images: true,
+                category: { select: { name: true } },
+                name: true,
+                price: true,
+                code: true,
+              },
+            },
+          },
+        },
+      },
+    })
+    .then((data) => {
+      const stream = res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment;filename=${data.orderCode}.pdf`,
+      });
+
+      invoiceHelper.createInvoice(
+        {
+          namaPemesan: data.customerName,
+          kodePemesanan: data.orderCode,
+          tanggalPemesanan: dayjs(data.orderDate).format("YYYY/MM/DD"),
+          noWa: data.whatsappNumber,
+          tanggalPengambilan: dayjs(data.pickupDate).format("YYYY/MM/DD"),
+          items: data.orderProduct.map((barang) => {
+            return {
+              kodeBarang: barang.product.code,
+              namaBarang: barang.product.name,
+              harga: barang.product.price,
+              jumlah: barang.quantity,
+            };
+          }),
+        },
+        (chunk) => stream.write(chunk),
+        () => stream.end()
+      );
+    })
+    .catch((error) => {
+      console.log(error);
+      res.status(400).json({ message: error.message });
+    });
 }
 
 module.exports = {
   CreateOrder,
   GetOrder,
+  GetOrderById,
   UploadPaymentProof,
   GetUserOrder,
   DeleteOrder,
+  ChangeStatus,
+  DownloadPdf,
 };

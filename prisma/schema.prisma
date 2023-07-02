@@ -25,23 +25,24 @@ model User {
 
 model Product {
   id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  code         String
   name         String
   price        Int
-  stock        Int
+  stock        Int?
   description  String
-  image        Image          @relation(fields: [imageId], references: [id])
+  images       Image[]
   category     Category       @relation(fields: [categoryId], references: [id])
   categoryId   String         @db.ObjectId
   OrderProduct OrderProduct[]
-  imageId      String         @db.ObjectId
 }
 
 model Image {
-  id      String    @id @default(auto()) @map("_id") @db.ObjectId
-  name    String    @unique
-  url     String
-  Order   Order[]
-  Product Product[]
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  url       String
+  Order     Order[]
+  Product   Product? @relation(fields: [productId], references: [id])
+  productId String?  @db.ObjectId
 }
 
 model Category {
@@ -72,7 +73,7 @@ model OrderProduct {
   id        String  @id @default(auto()) @map("_id") @db.ObjectId
   product   Product @relation(fields: [productId], references: [id])
   productId String  @db.ObjectId
-  order     Order   @relation(fields: [orderId], references: [id])
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId   String  @db.ObjectId
   quantity  Int
 }

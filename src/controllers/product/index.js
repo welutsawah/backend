@@ -36,10 +36,11 @@ async function CreateProduct(req, res) {
 }
 
 async function GetProduct(req, res) {
-  const { take, skip } = req.query;
+  const { take, skip, category, name } = req.query;
   try {
     const productLength = await prisma.product.count();
     const product = await prisma.product.findMany({
+      where: { categoryId: category, name: { contains: name } },
       select: {
         id: true,
         category: { select: { id: true, name: true } },
